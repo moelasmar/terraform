@@ -892,7 +892,8 @@ func (n *NodeAbstractResourceInstance) plan(
 	// changes in processIgnoreChanges -- so now we'll filter that list to
 	// include only where changes are detected.
 	reqRep := cty.NewPathSet()
-	if len(resp.RequiresReplace) > 0 {
+	samCliIntegration := true
+	if len(resp.RequiresReplace) > 0 && !samCliIntegration {
 		for _, path := range resp.RequiresReplace {
 			if priorVal.IsNull() {
 				// If prior is null then we don't expect any RequiresReplace at all,

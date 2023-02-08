@@ -2,6 +2,8 @@ package terraform
 
 import (
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/zclconf/go-cty/cty"
 	"log"
 
 	"github.com/hashicorp/terraform/internal/addrs"
@@ -407,7 +409,51 @@ func (n *NodeAbstractResource) readResourceInstanceState(ctx EvalContext, addr a
 	if src == nil {
 		// Presumably we only have deposed objects, then.
 		log.Printf("[TRACE] readResourceInstanceState: no state present for %s", addr)
-		return nil, nil
+		samCliIntegration := true
+		if !samCliIntegration {
+			return nil, nil
+		}
+		provider := n.Provider()
+		if provider.Type != "aws" || provider.Namespace != "hashicorp" {
+			return nil, nil
+		}
+
+		name := "arn"
+		arn_value := ""
+		id := ""
+		switch n.Config.Type {
+		case "aws_iam_role":
+			id = uuid.New().String()
+			arn_value = fmt.Sprintf(`arn:aws:iam::123456789012:role/%s`, id)
+		case "aws_lambda_layer_version":
+			id = uuid.New().String()
+			arn_value = fmt.Sprintf(`arn:aws:lambda:us-west-1:123456789012:layer:%s`, id)
+		case "aws_lambda_function":
+			id = uuid.New().String()
+			arn_value = fmt.Sprintf(`arn:aws:lambda:us-west-1:123456789012:function:%s`, id)
+
+		default:
+			return nil, nil
+		}
+
+		attrS, exists := n.Schema.Attributes[name]
+		if exists && attrS.Computed && attrS.Type.Equals(cty.String) {
+			attrs, _ := n.Config.Config.JustAttributes()
+			val, exists := attrs[name]
+			if !exists || val == nil {
+				current := &states.ResourceInstanceObjectSrc{
+					AttrsJSON:           []byte(fmt.Sprintf(`{"arn":"%s", "id": "%s"}`, arn_value, id)),
+					Status:              states.ObjectReady,
+					SchemaVersion:       0,
+					CreateBeforeDestroy: false,
+				}
+				inst := &states.ResourceInstance{
+					Current: current,
+					Deposed: map[states.DeposedKey]*states.ResourceInstanceObjectSrc{},
+				}
+				src = inst.GetGeneration(states.CurrentGen).DeepCopy()
+			}
+		}
 	}
 
 	schema, currentVersion := (providerSchema).SchemaForResourceAddr(addr.Resource.ContainingResource())
