@@ -413,6 +413,10 @@ func (n *NodeAbstractResource) readResourceInstanceState(ctx EvalContext, addr a
 		if !samCliIntegration {
 			return nil, nil
 		}
+		
+		// For the purpose of POC, I have hard-coded the Provider type, resources, and attributes that will be generated.
+		// However, in the actual implementation, Terraform will rely on a new parameter to determine which resources and 
+		// attributes should be generated, as well as the value pattern to be used in generating their values.
 		provider := n.Provider()
 		if provider.Type != "aws" || provider.Namespace != "hashicorp" {
 			return nil, nil
